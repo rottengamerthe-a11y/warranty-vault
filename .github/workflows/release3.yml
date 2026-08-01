@@ -37,4 +37,6 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build release AAB
+        env:
+          GRADLE_OPTS: -Xmx1024m
         run: ./gradlew :app:bundleRelease --no-daemon
