@@ -4,15 +4,6 @@
 /.idea
 .DS_Store
 /build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-
-# Keystore files (do NOT commit)
-*.jks
-*.keystore
-app/build/
 warrantyvault-keystore.jks.base64
 warrantyvault-keystore-*.jks
 warrantyvault-keystore-*.jks.base64
@@ -22,3 +13,11 @@ gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .vscode/
+
+# Gradle wrapper
+gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.vscode/
+=======
+>>>>>>> 7e4d09d (Remove warrantyvault-keystore.jks.base64 from repo and ignore it)
