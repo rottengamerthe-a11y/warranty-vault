@@ -1,0 +1,23 @@
+name: Release Sim
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Sim heredoc
+        run: |
+          cat > keystore.properties <<EOF
+storeFile=keystore.jks
+storePassword=sim
+keyAlias=sim
+keyPassword=sim
+EOF
+          echo "Wrote keystore.properties"
