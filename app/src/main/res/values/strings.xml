@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WarrantyVault</string>
+    <string name="cd_camera">Camera</string>
+    <string name="cd_save">Save</string>
+    <string name="cd_date">Select date</string>
+    <string name="cd_search">Search</string>
+    <string name="cd_filters">Filters</string>
+</resources>
