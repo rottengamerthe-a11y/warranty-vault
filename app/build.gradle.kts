@@ -17,10 +17,16 @@ val keystoreProps = Properties()
 if (keystorePropsFile.exists()) {
     keystorePropsFile.inputStream().use { keystoreProps.load(it) }
 }
-val propStorePassword: String? = keystoreProps.getProperty("STORE_PASSWORD")
-val propKeyAlias: String? = keystoreProps.getProperty("KEY_ALIAS")
-val propKeyPassword: String? = keystoreProps.getProperty("KEY_PASSWORD")
+// Accept multiple common property name variants so CI workflows and local
+// templates using different keys (e.g. `storeFile` vs `KEYSTORE_FILE`) work.
+val propStorePassword: String? = keystoreProps.getProperty("STORE_PASSWORD") ?: keystoreProps.getProperty("storePassword")
+val propKeyAlias: String? = keystoreProps.getProperty("KEY_ALIAS") ?: keystoreProps.getProperty("keyAlias")
+val propKeyPassword: String? = keystoreProps.getProperty("KEY_PASSWORD") ?: keystoreProps.getProperty("keyPassword")
 val propKeystoreFile: String? = keystoreProps.getProperty("KEYSTORE_FILE")
+    ?: keystoreProps.getProperty("KEYSTORE")
+    ?: keystoreProps.getProperty("storeFile")
+    ?: keystoreProps.getProperty("keystoreFile")
+    ?: keystoreProps.getProperty("keystore")
 
 android {
     namespace = "com.warrantyvault"
