@@ -33,5 +33,8 @@ jobs:
             echo "No keystore secret provided"
           fi
 
+      - name: Grant execute for gradlew
+        run: chmod +x ./gradlew
+
       - name: Build release AAB
         run: ./gradlew :app:bundleRelease --no-daemon
