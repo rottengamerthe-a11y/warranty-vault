@@ -7,6 +7,7 @@
 warrantyvault-keystore.jks.base64
 warrantyvault-keystore-*.jks
 warrantyvault-keystore-*.jks.base64
+<<<<<<< HEAD
 
 # Gradle wrapper
 gradle/wrapper/gradle-wrapper.jar
@@ -21,3 +22,5 @@ gradle/wrapper/gradle-wrapper.jar
 .vscode/
 =======
 >>>>>>> 7e4d09d (Remove warrantyvault-keystore.jks.base64 from repo and ignore it)
+=======
+>>>>>>> 5536318 (WIP: stash before rebase)

@@ -1,0 +1,48 @@
+name: Build & Release AAB (simple)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Decode keystore and create keystore.properties
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ./keystore.jks
+            cat > keystore.properties <<EOF
+storeFile=keystore.jks
+storePassword=${{ secrets.STORE_PASSWORD }}
+keyAlias=${{ secrets.KEY_ALIAS }}
+keyPassword=${{ secrets.KEY_PASSWORD }}
+EOF
+          else
+            echo "No KEYSTORE_BASE64 secret provided"
+          fi
+
+      - name: Grant execute for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build release AAB
+        run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: app/build/outputs/bundle/release/*.aab
