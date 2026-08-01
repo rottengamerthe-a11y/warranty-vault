@@ -28,7 +28,7 @@ jobs:
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             printf "%s" "$KEYSTORE_BASE64" | base64 --decode > ./app/warrantyvault-keystore.jks
-            printf "storeFile=app/warrantyvault-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
+            printf "storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" "$(pwd)/app/warrantyvault-keystore.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
           else
             echo "No keystore secret provided"
           fi
