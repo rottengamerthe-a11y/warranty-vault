@@ -40,3 +40,10 @@ jobs:
         env:
           GRADLE_OPTS: -Xmx1024m
         run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: warranty-vault-release-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
