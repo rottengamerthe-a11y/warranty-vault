@@ -53,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -89,17 +90,33 @@ fun HomeScreen(
     onOpen: (Long) -> Unit
 ) {
     val state by viewModel.homeState.collectAsStateWithLifecycle()
+    var exportPassword by remember { mutableStateOf("") }
+    var restorePassword by remember { mutableStateOf("") }
+    var showExportPasswordDialog by remember { mutableStateOf(false) }
+    var showRestorePasswordDialog by remember { mutableStateOf(false) }
     val jsonExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
-        if (it != null) settingsViewModel.exportJson(it)
+        if (it != null) settingsViewModel.exportJson(it, exportPassword.takeIf { p -> p.isNotEmpty() })
+        exportPassword = ""
     }
     val csvExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) {
         if (it != null) settingsViewModel.exportCsv(it)
     }
     val restore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
-        if (it != null) settingsViewModel.restoreJson(it)
+        if (it != null) settingsViewModel.restoreJson(it, restorePassword.takeIf { p -> p.isNotEmpty() })
+        restorePassword = ""
     }
     val listState = rememberLazyListState()
     var menuOpen by remember { mutableStateOf(false) }
+    
+    fun launchJsonExport() {
+        exportPassword = ""
+        showExportPasswordDialog = true
+    }
+    
+    fun launchRestore() {
+        restorePassword = ""
+        showRestorePasswordDialog = true
+    }
 
     Box(
         modifier = Modifier
@@ -127,8 +144,8 @@ fun HomeScreen(
                     menuOpen = menuOpen,
                     onMenuOpenChange = { menuOpen = it },
                     onCsvExport = { csvExport.launch("warranty-vault.csv") },
-                    onJsonExport = { jsonExport.launch("warranty-vault.json") },
-                    onRestore = { restore.launch(arrayOf("application/json")) },
+                    onJsonExport = { launchJsonExport() },
+                    onRestore = { launchRestore() },
                     onSettings = onSettings
                 )
             }
@@ -168,6 +185,82 @@ fun HomeScreen(
             onAlerts = onAlerts,
             onReceipts = onReceipts,
             onAdd = onAdd
+        )
+    }
+
+    // Export password dialog
+    if (showExportPasswordDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {
+                showExportPasswordDialog = false
+                exportPassword = ""
+            },
+            title = { Text("Backup encryption") },
+            text = {
+                Column {
+                    Text("Enter a password to encrypt your backup, or leave empty for unencrypted backup.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = exportPassword,
+                        onValueChange = { exportPassword = it },
+                        label = { Text("Password (optional)") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        jsonExport.launch("warranty-vault.json")
+                        showExportPasswordDialog = false
+                    }
+                ) { Text("Backup") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showExportPasswordDialog = false
+                    exportPassword = ""
+                }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Restore password dialog
+    if (showRestorePasswordDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {
+                showRestorePasswordDialog = false
+                restorePassword = ""
+            },
+            title = { Text("Restore backup") },
+            text = {
+                Column {
+                    Text("Enter the password if the backup is encrypted, or leave empty for unencrypted backup.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = restorePassword,
+                        onValueChange = { restorePassword = it },
+                        label = { Text("Password (if encrypted)") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        restore.launch(arrayOf("application/json"))
+                        showRestorePasswordDialog = false
+                    }
+                ) { Text("Restore") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showRestorePasswordDialog = false
+                    restorePassword = ""
+                }) { Text("Cancel") }
+            }
         )
     }
 }

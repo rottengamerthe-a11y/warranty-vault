@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
     id("com.google.dagger.hilt.android")
+    // Comment out google-services until Firebase is properly configured
+    // id("com.google.gms.google-services")
 }
 
 import java.util.Properties
@@ -90,6 +92,20 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/license.txt"
+            excludes += "/META-INF/NOTICE"
+            excludes += "/META-INF/NOTICE.txt"
+            excludes += "/META-INF/notice.txt"
+            excludes += "/META-INF/*.kotlin_module"
+        }
+    }
 }
 
 kapt {
@@ -140,6 +156,28 @@ dependencies {
 
     // Encrypted SharedPreferences for secure local storage
     implementation("androidx.security:security-crypto:1.1.0")
+    
+    // Biometric authentication
+    implementation("androidx.biometric:biometric:1.1.0")
+    
+    // Hilt WorkManager integration
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    kapt("androidx.hilt:hilt-compiler:1.2.0")
+    
+    // Google Drive API for cloud backup
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0")
+    implementation("com.google.http-client:google-http-client-gson:1.43.3")
+    
+    // Firebase - Commented out until properly configured
+    // Uncomment these and enable google-services plugin to use Firebase features
+    /*
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+    */
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

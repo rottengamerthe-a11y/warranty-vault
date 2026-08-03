@@ -15,6 +15,7 @@ import javax.inject.Singleton
 import com.warrantyvault.data.WarrantyItemEntity
 import com.warrantyvault.data.WarrantyItemWithAttachments
 import com.warrantyvault.reminders.ReminderScheduler
+import com.warrantyvault.security.BackupEncryption
 import java.io.File
 
 @Singleton
@@ -25,7 +26,7 @@ class ExportImportManager @Inject constructor(
 	private val reminders: ReminderScheduler
 ) {
 
-	suspend fun exportJson(target: Uri) = withContext(Dispatchers.IO) {
+	suspend fun exportJson(target: Uri, password: String? = null) = withContext(Dispatchers.IO) {
 		val items: List<WarrantyItemWithAttachments> = dao.getAllItemsWithAttachments()
 		val arr = JSONArray()
 		val tempDir = File(context.cacheDir, "export_${System.currentTimeMillis()}").apply { mkdirs() }
@@ -67,7 +68,34 @@ class ExportImportManager @Inject constructor(
 			}
 
 			// write data.json in temp dir
-			File(tempDir, "data.json").writeText(arr.toString())
+			val jsonData = arr.toString()
+			val finalData = if (password != null && password.isNotEmpty()) {
+				// Add metadata and encrypt
+				val metadata = JSONObject().apply {
+					put("version", "2.0")
+					put("encrypted", true)
+					put("exportDate", System.currentTimeMillis())
+				}
+				val combined = JSONObject().apply {
+					put("metadata", metadata)
+					put("data", jsonData)
+				}
+				BackupEncryption.encryptString(combined.toString(), password)
+			} else {
+				// Unencrypted export with metadata
+				val metadata = JSONObject().apply {
+					put("version", "2.0")
+					put("encrypted", false)
+					put("exportDate", System.currentTimeMillis())
+				}
+				val combined = JSONObject().apply {
+					put("metadata", metadata)
+					put("data", arr)
+				}
+				combined.toString()
+			}
+			
+			File(tempDir, "data.json").writeText(finalData)
 			// zip tempDir into target
 			context.contentResolver.openOutputStream(target)?.use { outStream ->
 				java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(outStream)).use { zos ->
@@ -109,7 +137,7 @@ class ExportImportManager @Inject constructor(
 		}
 	}
 
-	suspend fun restoreJson(source: Uri) = withContext(Dispatchers.IO) {
+	suspend fun restoreJson(source: Uri, password: String? = null) = withContext(Dispatchers.IO) {
 		val isZip = source.toString().lowercase().endsWith(".zip") || (runCatching {
 			context.contentResolver.openInputStream(source)?.use { input ->
 				val header = ByteArray(4)
@@ -140,7 +168,39 @@ class ExportImportManager @Inject constructor(
 				context.contentResolver.openInputStream(source)?.bufferedReader()?.use { it.readText() }.orEmpty()
 			}
 
-			val rows = JSONArray(jsonText)
+			// Handle encrypted or new format with metadata
+			val finalJsonText = if (BackupEncryption.isEncryptedBackup(jsonText)) {
+				if (password != null && password.isNotEmpty()) {
+					BackupEncryption.decryptString(jsonText, password) ?: throw SecurityException("Invalid password or corrupted backup")
+				} else {
+					throw SecurityException("Backup is encrypted. Please provide password.")
+				}
+			} else {
+				jsonText
+			}
+
+			// Parse the JSON - handle both old format (array) and new format (object with metadata)
+			val rows = if (finalJsonText.trim().startsWith("[")) {
+				// Old format - direct array
+				JSONArray(finalJsonText)
+			} else {
+				// New format - object with metadata
+				val obj = JSONObject(finalJsonText)
+				val metadata = obj.optJSONObject("metadata")
+				val isEncrypted = metadata?.optBoolean("encrypted", false) ?: false
+				
+				if (isEncrypted && (password == null || password.isEmpty())) {
+					throw SecurityException("Backup is encrypted. Please provide password.")
+				}
+				
+				val data = obj.opt("data")
+				when (data) {
+					is String -> JSONArray(data) // Encrypted data is stored as string
+					is JSONArray -> data // Unencrypted data is JSONArray
+					else -> JSONArray() // Fallback
+				}
+			}
+			
 			val now = System.currentTimeMillis()
 
 			database.withTransaction {

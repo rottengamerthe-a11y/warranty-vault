@@ -35,3 +35,7 @@ fun daysUntil(epochMillis: Long?): Long? {
     val target = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     return java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), target)
 }
+
+fun Long.formatBackupDate(): String {
+    return Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate().format(displayFormatter)
+}

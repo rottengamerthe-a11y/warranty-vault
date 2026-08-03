@@ -1,26 +1,40 @@
-*.iml
+# Gradle
 .gradle
-/local.properties
-/.idea
-.DS_Store
 /build
-warrantyvault-keystore.jks.base64
-warrantyvault-keystore-*.jks
-warrantyvault-keystore-*.jks.base64
-<<<<<<< HEAD
-
-# Gradle wrapper
+/local.properties
 gradle/wrapper/gradle-wrapper.jar
 
 # IDE
+.idea/
 .vscode/
+*.iml
+.DS_Store
 
-# Gradle wrapper
-gradle/wrapper/gradle-wrapper.jar
+# Keystores & signing secrets — NEVER commit these
+*.jks
+*.jks.base64
+keystore.properties
+keystore.properties.example
+keystore.properties.template
 
-# IDE
-.vscode/
-=======
->>>>>>> 7e4d09d (Remove warrantyvault-keystore.jks.base64 from repo and ignore it)
-=======
->>>>>>> 5536318 (WIP: stash before rebase)
+# Google OAuth / Firebase secrets
+app/src/main/client_secret_*.json
+app/google-services.json
+
+# Build output
+app/build/
+*.apk
+*.aab
+
+# Local debug / CI scratch files
+failed_*.txt
+run*.json
+run*.txt
+release3_*.txt
+release3_*.json
+remote_release*.yml
+remote_release*_b64.txt
+check_suite.json
+latest_status.json
+job_view.txt
+full_*.txt

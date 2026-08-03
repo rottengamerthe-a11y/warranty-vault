@@ -4,7 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.view.WindowManager
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,16 +16,25 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.warrantyvault.security.BiometricAuthManager
+import com.warrantyvault.security.InactivityTracker
+import com.warrantyvault.security.PasswordHasher
+import com.warrantyvault.security.SessionManager
 import com.warrantyvault.ui.AccountCredentials
 import com.warrantyvault.ui.AppViewModel
 import com.warrantyvault.ui.AlertsScreen
+import com.warrantyvault.ui.LockScreen
+import com.warrantyvault.ui.PrivacyScreen
+import com.warrantyvault.ui.ReauthDialog
 import com.warrantyvault.ui.AuthScreen
 import com.warrantyvault.ui.DetailScreen
 import com.warrantyvault.ui.EditItemScreen
@@ -36,16 +46,44 @@ import com.warrantyvault.ui.ReceiptsScreen
 import com.warrantyvault.ui.ScanReceiptScreen
 import com.warrantyvault.ui.SettingsScreen
 import com.warrantyvault.ui.SettingsViewModel
+import com.warrantyvault.ui.GoogleDriveViewModel
 import com.warrantyvault.ui.ThemeConfig
 import com.warrantyvault.ui.WarrantyVaultTheme
 import kotlinx.coroutines.delay
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val viewModel: AppViewModel by viewModels()
     private val homeViewModel: HomeViewModel by viewModels()
     private val settingsViewModel: SettingsViewModel by viewModels()
+    private val googleDriveViewModel: GoogleDriveViewModel by viewModels()
+    
+    private val inactivityTracker = InactivityTracker(applicationContext)
+    private val biometricAuthManager = BiometricAuthManager(applicationContext)
+    private val sessionManager = SessionManager(applicationContext)
+
+    override fun onResume() {
+        super.onResume()
+        inactivityTracker.checkInactivity()
+        sessionManager.checkSessionValidity()
+    }
+    
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        inactivityTracker.onUserActivity()
+    }
+    
+    fun setScreenshotProtection(enabled: Boolean) {
+        if (enabled) {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
+            )
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -69,6 +107,55 @@ class MainActivity : ComponentActivity() {
             var currentTheme by remember {
                 mutableStateOf(ThemeConfig.fromKey(settingsPrefs.getString("theme", "vault") ?: "vault"))
             }
+            var screenshotProtectionEnabled by remember { 
+                mutableStateOf(settingsPrefs.getBoolean("screenshot_protection", true)) 
+            }
+            val isLocked by inactivityTracker.isLocked.collectAsState()
+            val sessionValid by sessionManager.sessionValid.collectAsState()
+            var showBiometricPrompt by remember { mutableStateOf(false) }
+            var showReauthDialog by remember { mutableStateOf(false) }
+            
+            // Handle biometric authentication when locked
+            LaunchedEffect(isLocked) {
+                if (isLocked && settingsPrefs.getBoolean("biometric_enabled", false)) {
+                    if (biometricAuthManager.canAuthenticate()) {
+                        showBiometricPrompt = true
+                    }
+                }
+            }
+            
+            LaunchedEffect(showBiometricPrompt) {
+                if (showBiometricPrompt) {
+                    try {
+                        val success = biometricAuthManager.authenticate(this@MainActivity)
+                        if (success) {
+                            inactivityTracker.unlock()
+                            sessionManager.onAuthenticated()
+                        }
+                    } catch (e: Exception) {
+                        // Biometric failed or was cancelled — user can use password instead
+                    }
+                    showBiometricPrompt = false
+                }
+            }
+            
+            // Handle session expiration and re-authentication
+            LaunchedEffect(sessionValid) {
+                if (!sessionValid && signedIn) {
+                    showReauthDialog = true
+                }
+            }
+            
+            // Handle screenshot protection setting
+            LaunchedEffect(Unit) {
+                setScreenshotProtection(settingsPrefs.getBoolean("screenshot_protection", true))
+                sessionManager.setSessionTimeoutFromSettings(settingsPrefs)
+            }
+            
+            // Apply screenshot protection when setting changes
+            LaunchedEffect(screenshotProtectionEnabled) {
+                setScreenshotProtection(screenshotProtectionEnabled)
+            }
 
             // Wrap with the selected theme — all composables inside pick it up
             WarrantyVaultTheme(themeConfig = currentTheme) {
@@ -79,6 +166,33 @@ class MainActivity : ComponentActivity() {
 
                 if (!launchComplete) {
                     LaunchScreen()
+                    return@WarrantyVaultTheme
+                }
+                
+                // Show lock screen if app is locked — requires real authentication
+                if (isLocked) {
+                    val storedPassword = accountPrefs.getString("password", null)
+                    LockScreen(
+                        onUnlock = {
+                            inactivityTracker.unlock()
+                            sessionManager.onAuthenticated()
+                        },
+                        onBiometricUnlock = {
+                            if (settingsPrefs.getBoolean("biometric_enabled", false) && biometricAuthManager.canAuthenticate()) {
+                                showBiometricPrompt = true
+                            }
+                        },
+                        verifyPassword = { input ->
+                            storedPassword != null && (
+                                if (storedPassword.startsWith("pbkdf2$")) {
+                                    PasswordHasher.verify(input, storedPassword)
+                                } else {
+                                    input == storedPassword
+                                }
+                            )
+                        },
+                        biometricAvailable = settingsPrefs.getBoolean("biometric_enabled", false) && biometricAuthManager.canAuthenticate()
+                    )
                     return@WarrantyVaultTheme
                 }
 
@@ -111,15 +225,39 @@ class MainActivity : ComponentActivity() {
                             accountPrefs.edit()
                                 .putString("name", credentials.name)
                                 .putString("email", credentials.email)
-                                .putString("password", credentials.password)
+                                .putString("password", PasswordHasher.hash(credentials.password))
                                 .putBoolean("signed_in", true)
                                 .apply()
                             accountName = credentials.name
                             accountEmail = credentials.email
                             signedIn = true
+                            sessionManager.onAuthenticated()
                         }
                     )
                     return@WarrantyVaultTheme
+                }
+                
+                // Show re-authentication dialog if session expired (overlay on top of content)
+                if (showReauthDialog) {
+                    ReauthDialog(
+                        onDismiss = { showReauthDialog = false },
+                        onReauth = {
+                            showReauthDialog = false
+                            // Trigger biometric or show auth screen
+                            if (settingsPrefs.getBoolean("biometric_enabled", false) && biometricAuthManager.canAuthenticate()) {
+                                showBiometricPrompt = true
+                            } else {
+                                // Navigate to auth screen
+                                accountPrefs.edit().putBoolean("signed_in", false).apply()
+                                signedIn = false
+                            }
+                        },
+                        onSignOut = {
+                            showReauthDialog = false
+                            accountPrefs.edit().remove("password").putBoolean("signed_in", false).apply()
+                            signedIn = false
+                        }
+                    )
                 }
 
                 val snackbarHostState = remember { SnackbarHostState() }
@@ -165,6 +303,7 @@ class MainActivity : ComponentActivity() {
                                 accountEmail = accountEmail.orEmpty(),
                                 viewModel = viewModel,
                                 settingsViewModel = settingsViewModel,
+                                googleDriveViewModel = googleDriveViewModel,
                                 currentTheme = currentTheme,
                                 onThemeChange = { theme ->
                                     currentTheme = theme
@@ -178,7 +317,39 @@ class MainActivity : ComponentActivity() {
                                 onShowTutorial = {
                                     navController.popBackStack()
                                     showTutorial = true
+                                },
+                                onShowPrivacy = {
+                                    navController.navigate("privacy")
+                                },
+                                onScreenshotProtectionChange = { enabled ->
+                                    screenshotProtectionEnabled = enabled
+                                },
+                                onChangePassword = { current, newPassword ->
+                                    val stored = accountPrefs.getString("password", null)
+                                    if (stored == null) return@SettingsScreen false
+                                    val currentValid = if (stored.startsWith("pbkdf2$")) {
+                                        PasswordHasher.verify(current, stored)
+                                    } else {
+                                        current == stored
+                                    }
+                                    if (currentValid) {
+                                        accountPrefs.edit()
+                                            .putString("password", PasswordHasher.hash(newPassword))
+                                            .apply()
+                                        true
+                                    } else {
+                                        false
+                                    }
                                 }
+                            )
+                        }
+                        composable("privacy") {
+                            val state by viewModel.homeState.collectAsStateWithLifecycle()
+                            PrivacyScreen(
+                                contentPadding = contentPadding,
+                                itemCount = state.items.size,
+                                attachmentCount = state.items.sumOf { it.attachments.size },
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("alerts") {

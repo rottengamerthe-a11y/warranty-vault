@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.warrantyvault.security.PasswordHasher
 
 data class AccountCredentials(
     val name: String,
@@ -174,7 +175,8 @@ fun AuthScreen(
                         cleanEmail.isBlank() || password.length < 4 -> error = "Enter an email and a password with at least 4 characters."
                         signupMode -> onAuthenticated(AccountCredentials(name.trim().ifBlank { "Vault owner" }, cleanEmail, password))
                         savedEmail == null || savedPassword == null -> error = "Create an account first."
-                        cleanEmail != savedEmail || password != savedPassword -> error = "Email or password does not match."
+                        cleanEmail != savedEmail -> error = "Email or password does not match."
+                        !isPasswordValid(password, savedPassword) -> error = "Email or password does not match."
                         else -> onAuthenticated(AccountCredentials(name.trim().ifBlank { "Vault owner" }, cleanEmail, password))
                     }
                 },
@@ -196,6 +198,20 @@ fun AuthScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Verifies a password against the stored value. Supports both the new PBKDF2
+ * hashed format and legacy plaintext storage (for accounts created before
+ * hashing was introduced). Legacy plaintext is upgraded to a hash on next login.
+ */
+private fun isPasswordValid(input: String, stored: String): Boolean {
+    return if (stored.startsWith("pbkdf2$")) {
+        PasswordHasher.verify(input, stored)
+    } else {
+        // Legacy plaintext comparison
+        input == stored
     }
 }
 

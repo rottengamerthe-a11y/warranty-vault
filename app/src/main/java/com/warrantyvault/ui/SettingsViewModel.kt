@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warrantyvault.data.WarrantyRepository
 import com.warrantyvault.export.ExportImportManager
+// Firebase imports - commented out until Firebase is properly configured
+// import com.warrantyvault.cloud.FirebaseAuthManager
+// import com.warrantyvault.cloud.CloudBackupManager
+// import com.warrantyvault.cloud.FirestoreSyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -15,13 +19,17 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val exportImport: ExportImportManager,
     private val repository: WarrantyRepository
+    // Firebase dependencies - commented out until Firebase is properly configured
+    // private val authManager: FirebaseAuthManager,
+    // private val cloudBackupManager: CloudBackupManager,
+    // private val syncManager: FirestoreSyncManager
 ) : ViewModel() {
     private val _messages = MutableSharedFlow<String>()
     val messages = _messages.asSharedFlow()
 
-    fun exportJson(uri: Uri) {
+    fun exportJson(uri: Uri, password: String? = null) {
         viewModelScope.launch {
-            runCatching { exportImport.exportJson(uri) }
+            runCatching { exportImport.exportJson(uri, password) }
                 .onSuccess { _messages.emit("JSON backup saved") }
                 .onFailure { _messages.emit("Could not export JSON: ${it.userMessage()}") }
         }
@@ -35,9 +43,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun restoreJson(uri: Uri) {
+    fun restoreJson(uri: Uri, password: String? = null) {
         viewModelScope.launch {
-            runCatching { exportImport.restoreJson(uri) }
+            runCatching { exportImport.restoreJson(uri, password) }
                 .onSuccess { _messages.emit("Backup restored") }
                 .onFailure { _messages.emit("Could not restore backup: ${it.userMessage()}") }
         }
@@ -60,6 +68,43 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
+    
+    // Firebase cloud features - commented out until Firebase is properly configured
+    /*
+    fun setCloudSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { syncManager.enableSync(enabled) }
+                .onSuccess { 
+                    if (enabled) {
+                        _messages.emit("Cloud sync enabled")
+                    } else {
+                        _messages.emit("Cloud sync disabled")
+                    }
+                }
+                .onFailure { _messages.emit("Could not ${if (enabled) "enable" else "disable"} cloud sync: ${it.userMessage()}") }
+        }
+    }
+    
+    fun setCloudBackupEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            if (enabled) {
+                runCatching { cloudBackupManager.listBackups() }
+                    .onSuccess { _messages.emit("Cloud backup enabled") }
+                    .onFailure { _messages.emit("Cloud backup not available: ${it.userMessage()}") }
+            } else {
+                _messages.emit("Cloud backup disabled")
+            }
+        }
+    }
+    
+    fun sendPasswordResetEmail(email: String) {
+        viewModelScope.launch {
+            runCatching { authManager.sendPasswordResetEmail(email) }
+                .onSuccess { _messages.emit("Password reset email sent") }
+                .onFailure { _messages.emit("Could not send reset email: ${it.userMessage()}") }
+        }
+    }
+    */
 }
 
 private fun Throwable.userMessage(): String = message?.takeIf { it.isNotBlank() } ?: "please try again"
