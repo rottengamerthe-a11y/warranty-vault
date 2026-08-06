@@ -38,3 +38,14 @@ check_suite.json
 latest_status.json
 job_view.txt
 full_*.txt
+
+# Documentation and Sensitive Markdown Files
+ATOMIC_IMPORT.md
+CI_SECRETS_INSTRUCTIONS.md
+DATA_SAFETY.md
+FIREBASE_SETUP.md
+FREE_BACKUP_SETUP.md
+PHASE3_IMPLEMENTATION.md
+PLAY_STORE_ROTATION.md
+PRIVACY_POLICY.md
+app/KEystore.example.md
